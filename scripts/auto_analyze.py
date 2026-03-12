@@ -113,9 +113,7 @@ def format_full_report_messages(bug_messages, at_me_messages, group_name):
     current_msg = header
     
     for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
-        content = msg['content'].replace('\n', ' ')[:300]
-        if len(msg['content']) > 300:
-            content += '...'
+        content = msg['content'].replace('\n', ' ')  # 完整内容，不截断
         
         # 添加引用标记
         ref_mark = " ⚠️含引用" if has_reference_message(msg['content']) else ""

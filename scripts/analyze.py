@@ -326,20 +326,18 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
     with codecs.open(output_path, 'w', encoding='utf-8') as f:
         f.write(report_content)
     
-    # === POPO 摘要报告 ===
+    # === POPO 摘要报告（完整内容）===
     summary_lines = [
         u"🎮 荒野行动群聊 Bug 监控报告",
         u"⏰ 时间范围：{0} ~ {1}".format(time_start, time_end),
-        u"� 发现 bug 数：{0}".format(len(bug_messages)),
+        u"📊 发现 bug 数：{0}".format(len(bug_messages)),
         u"=" * 50,
     ]
     
-    # Bug 反馈详情
+    # Bug 反馈详情（完整内容）
     if bug_messages:
         for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
-            content = msg['content'].replace('\n', ' ')[:200]
-            if len(msg['content']) > 200:
-                content += u'...'
+            content = msg['content'].replace('\n', ' ')  # 不截断，显示完整内容
             ref_mark = u" ⚠️含引用" if has_reference_message(msg['content']) else ""
             summary_lines.append(u"")
             summary_lines.append(u"【{0}】{1} @ {2}".format(i, msg['sender'], msg['timestamp']))
