@@ -1,0 +1,13 @@
+# 敏感配置文件（用户需要自己配置）
+config.local.json
+
+# 编译文件
+*.pyc
+__pycache__/
+
+# 报告文件（每次运行生成）
+report.txt
+report_summary.txt
+
+# Review 历史（每个用户的数据不同）
+# review_history.json  # 保留，因为包含学习数据
