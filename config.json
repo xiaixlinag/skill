@@ -2,8 +2,9 @@
   "message_input": "../qsec-wechat-export/message.txt",
   "group_name": "你的群名",
   "nickname": "你的微信昵称",
-  "popo_webhook": "https://open.popo.netease.com/open-apis/robots/v1/hook/YOUR_WEBHOOK_ID",
+  "popo_webhook": "",
   "popo_keyword": "总结",
   "auto_analyze_interval": 3600,
-  "auto_push_to_popo": true
+  "auto_push_to_popo": false,
+  "_comment": "请将敏感信息配置到 config.local.json 中，该文件不会被提交到 Git"
 }

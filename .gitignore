@@ -9,5 +9,10 @@ __pycache__/
 report.txt
 report_summary.txt
 
+# 临时文件
+popo_msg.json
+popo_msg_nobom.json
+*.tmp
+
 # Review 历史（每个用户的数据不同）
 # review_history.json  # 保留，因为包含学习数据

@@ -35,11 +35,65 @@
       "content": "造密码的玉球 瞎给我报名 点开系统一看 全是突围黑产又不封",
       "type": "false_positive",
       "reason": "关于外挂/黑产的抱怨，不是bug反馈"
+    },
+    {
+      "timestamp": "2026-03-12 21:11:00",
+      "content": "举报了，没用无异常",
+      "type": "false_positive",
+      "reason": "讨论举报结果，不是bug反馈"
+    },
+    {
+      "timestamp": "2026-03-12 21:11:10",
+      "content": "马上活动都要结束了，合成那么多也用不了",
+      "type": "false_positive",
+      "reason": "活动进度吐槽，不是bug反馈"
+    },
+    {
+      "timestamp": "2026-03-12 21:11:20",
+      "content": "bug小哥",
+      "type": "false_positive",
+      "reason": "只是在叫人，不是bug反馈"
+    },
+    {
+      "timestamp": "2026-03-12 21:11:30",
+      "content": "@修bug小弟 台服也没有这个问题啊，就国际服有问题，能不能一视同仁阿",
+      "type": "correct",
+      "reason": "真实bug反馈：国际服和台服功能差异问题"
+    },
+    {
+      "timestamp": "2026-03-12 21:11:40",
+      "content": "@修bug小弟 天宫建木崖傍边那个坑，我挂机困里面10分钟了",
+      "type": "correct",
+      "reason": "真实bug反馈：地图卡住问题"
+    },
+    {
+      "timestamp": "2026-03-12 21:11:50",
+      "content": "冲击手雷丢到空投落点位置会直接让空投落地是设定还是bug",
+      "type": "correct",
+      "reason": "真实bug反馈：手雷与空投交互问题"
+    },
+    {
+      "timestamp": "2026-03-12 21:12:00",
+      "content": "国际服新动作里的蹲下，同样蹲一下，但国服都可以连续蹲2下了",
+      "type": "correct",
+      "reason": "真实bug反馈：动作系统国服国际服不一致"
+    },
+    {
+      "timestamp": "2026-03-12 21:12:10",
+      "content": "为什么有时候看别人主页的时候会出现在人家背景的载具里啊",
+      "type": "correct",
+      "reason": "真实bug反馈：主页显示异常"
+    },
+    {
+      "timestamp": "2026-03-12 21:12:20",
+      "content": "有没有可能这是bug？为什么更新后加特林伤害变成275％年兽血反而打完一弹夹多了一格血",
+      "type": "correct",
+      "reason": "真实bug反馈：武器伤害计算异常"
     }
   ],
   "stats": {
-    "false_positive": 4,
-    "correct": 2,
-    "total": 6
+    "false_positive": 7,
+    "correct": 8,
+    "total": 15
   }
 }

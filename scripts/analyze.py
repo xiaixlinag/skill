@@ -57,6 +57,14 @@ BUG_PATTERNS = [
     r'(看|发现|遇到).{0,10}(回放|淘汰).{0,15}(显示|出现)',  # 回放相关问题
 ]
 
+# === 引用消息检测 ===
+# 微信导出时，引用消息会显示为 [链接] 但实际是引用其他消息
+REFERENCE_INDICATOR = u'[链接]'
+
+def has_reference_message(content):
+    """检测消息是否包含引用/回复（显示为[链接]）"""
+    return REFERENCE_INDICATOR in content
+
 # === 动态规则加载 ===
 def load_learned_rules():
     """加载从 review 中学习到的规则"""
@@ -128,7 +136,8 @@ def is_bug_report(content, learned_rules=None):
     智能判断消息是否是 bug 反馈
     
     匹配策略:
-    1. 检查学习到的排除词（优先）
+    0. 检查短消息排除列表
+    1. 检查学习到的排除词和模式（优先）
     2. 高优先级关键词直接匹配
     3. 问题词 + 功能词 组合匹配（包括学习到的新词）
     4. Bug 句式模式匹配
@@ -136,7 +145,28 @@ def is_bug_report(content, learned_rules=None):
     if learned_rules is None:
         learned_rules = load_learned_rules()
     
-    # 策略0: 检查是否命中排除词
+    content_stripped = content.strip()
+    
+    # 策略0a: 短消息排除（少于10个字符的简短消息）
+    short_excludes = learned_rules.get('short_message_exclude', [])
+    if len(content_stripped) < 15:
+        for short in short_excludes:
+            if short in content_stripped:
+                return False
+        # 纯叫人的消息
+        if content_stripped in ['bug小哥', 'bug小弟', '修bug', '举报了', '没用', '无异常']:
+            return False
+    
+    # 策略0b: 检查排除模式（正则）
+    exclude_patterns = learned_rules.get('exclude_patterns', [])
+    for pattern in exclude_patterns:
+        try:
+            if re.search(pattern, content):
+                return False
+        except:
+            pass
+    
+    # 策略0c: 检查是否命中排除词
     exclude_words = learned_rules.get('exclude_words', [])
     for word in exclude_words:
         if word in content:
@@ -220,6 +250,18 @@ def filter_messages(messages, group_name, nickname):
     
     return bug_messages, at_me_messages
 
+def format_message_with_ref_marker(msg, max_length=200):
+    """格式化消息内容，如果包含引用消息则添加标记"""
+    content = msg['content'][:max_length].replace('\n', ' ')
+    if len(msg['content']) > max_length:
+        content += u'...'
+    
+    # 如果包含引用消息，添加标记
+    if has_reference_message(msg['content']):
+        content += u' ⚠️含引用'
+    
+    return content
+
 def generate_report(bug_messages, at_me_messages, group_name, output_path):
     """生成分析报告"""
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -230,6 +272,12 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
         key = "{0}_{1}_{2}".format(m['timestamp'], m['sender'], m['content'][:50])
         all_msgs[key] = m
     unique_count = len(all_msgs)
+    
+    # 统计含引用消息的数量
+    ref_count = 0
+    for m in list(all_msgs.values()):
+        if has_reference_message(m['content']):
+            ref_count += 1
     
     report_lines = [
         u"📊 微信群 Bug 反馈分析报告",
@@ -242,18 +290,20 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
         u"Bug 相关消息: {0} 条".format(len(bug_messages)),
         u"@我 的消息: {0} 条".format(len(at_me_messages)),
         u"去重后总计: {0} 条".format(unique_count),
-        u""
     ]
+    
+    # 如果有引用消息，添加提示
+    if ref_count > 0:
+        report_lines.append(u"⚠️ 含引用消息: {0} 条 (需人工查看微信原文)".format(ref_count))
+    
+    report_lines.append(u"")
     
     # Bug 反馈详情
     if bug_messages:
         report_lines.append(u"🐛 Bug 反馈详情 (按时间排序)")
         report_lines.append(u"-" * 40)
         for msg in sorted(bug_messages, key=lambda x: x['timestamp']):
-            # 显示完整内容，最多500字符
-            content_full = msg['content'][:500].replace('\n', ' ')
-            if len(msg['content']) > 500:
-                content_full += u'...'
+            content_full = format_message_with_ref_marker(msg, 500)
             report_lines.append(u"[{0}] {1}: {2}".format(msg['timestamp'], msg['sender'], content_full))
         report_lines.append(u"")
     
@@ -262,11 +312,17 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
         report_lines.append(u"📢 @我 的消息")
         report_lines.append(u"-" * 40)
         for msg in sorted(at_me_messages, key=lambda x: x['timestamp']):
-            content_preview = msg['content'][:100].replace('\n', ' ')
-            if len(msg['content']) > 100:
-                content_preview += u'...'
+            content_preview = format_message_with_ref_marker(msg, 100)
             report_lines.append(u"[{0}] {1}: {2}".format(msg['timestamp'], msg['sender'], content_preview))
         report_lines.append(u"")
+    
+    # 如果有引用消息，添加说明
+    if ref_count > 0:
+        report_lines.append(u"")
+        report_lines.append(u"📋 说明:")
+        report_lines.append(u"-" * 40)
+        report_lines.append(u"⚠️含引用 = 该消息引用/回复了其他消息，")
+        report_lines.append(u"   但引用内容无法自动解析，请到微信中查看原文。")
     
     report_content = '\n'.join(report_lines)
     
@@ -274,9 +330,9 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
     with codecs.open(output_path, 'w', encoding='utf-8') as f:
         f.write(report_content)
     
-    # 生成摘要报告（用于 POPO 推送，限制长度）
+    # 生成摘要报告（用于 POPO 推送，包含完整内容）
     summary_lines = [
-        u"📊 微信群 Bug 反馈分析",
+        u"📊 微信群 Bug 反馈分析报告",
         u"群名: {0}".format(group_name),
         u"时间: {0}".format(now),
         u"",
@@ -286,27 +342,29 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
         u"• 去重总计: {0} 条".format(unique_count)
     ]
     
-    # 添加最近的 bug 消息预览（最多 5 条）
+    # 如果有引用消息，添加提示
+    if ref_count > 0:
+        summary_lines.append(u"• ⚠️含引用: {0} 条 (需查看微信原文)".format(ref_count))
+    
+    # 添加所有 bug 消息的完整内容
     if bug_messages:
         summary_lines.append(u"")
-        summary_lines.append(u"🐛 最新 Bug 反馈:")
-        recent_bugs = sorted(bug_messages, key=lambda x: x['timestamp'], reverse=True)[:5]
-        for msg in recent_bugs:
-            content_preview = msg['content'][:50].replace('\n', ' ')
-            if len(msg['content']) > 50:
-                content_preview += u'...'
-            summary_lines.append(u"• [{0}] {1}: {2}".format(msg['timestamp'][5:16], msg['sender'], content_preview))
+        summary_lines.append(u"🐛 Bug 反馈详情:")
+        for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
+            content_full = format_message_with_ref_marker(msg, 200)
+            summary_lines.append(u"")
+            summary_lines.append(u"{0}️⃣ [{1}] {2}:".format(i, msg['timestamp'][5:16], msg['sender']))
+            summary_lines.append(u"{0}".format(content_full))
     
-    # 添加最近 @我 的消息预览（最多 3 条）
+    # 添加所有 @我 的消息完整内容
     if at_me_messages:
         summary_lines.append(u"")
-        summary_lines.append(u"📢 最新 @我:")
-        recent_at = sorted(at_me_messages, key=lambda x: x['timestamp'], reverse=True)[:3]
-        for msg in recent_at:
-            content_preview = msg['content'][:50].replace('\n', ' ')
-            if len(msg['content']) > 50:
-                content_preview += u'...'
-            summary_lines.append(u"• [{0}] {1}: {2}".format(msg['timestamp'][5:16], msg['sender'], content_preview))
+        summary_lines.append(u"📢 @我 的消息:")
+        for i, msg in enumerate(sorted(at_me_messages, key=lambda x: x['timestamp']), 1):
+            content_full = format_message_with_ref_marker(msg, 200)
+            summary_lines.append(u"")
+            summary_lines.append(u"{0}️⃣ [{1}] {2}:".format(i, msg['timestamp'][5:16], msg['sender']))
+            summary_lines.append(u"{0}".format(content_full))
     
     summary_content = '\n'.join(summary_lines)
     

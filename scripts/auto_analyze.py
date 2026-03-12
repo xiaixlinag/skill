@@ -3,6 +3,7 @@
 """
 自动分析脚本
 每小时自动分析微信群聊天记录并推送到 POPO
+支持分段发送完整原文
 """
 
 from __future__ import print_function
@@ -29,17 +30,27 @@ else:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SKILL_DIR = os.path.dirname(SCRIPT_DIR)
 
+# 消息长度限制（POPO 限制约 3000 字符，预留空间）
+MAX_MESSAGE_LENGTH = 2500
+
 def load_config():
-    """加载配置文件"""
+    """加载配置文件（优先使用 config.local.json）"""
+    # 优先使用本地配置（包含敏感信息）
+    local_config_file = os.path.join(SKILL_DIR, 'config.local.json')
     config_file = os.path.join(SKILL_DIR, 'config.json')
-    if not os.path.exists(config_file):
-        print("[ERROR] config.json not found")
+    
+    if os.path.exists(local_config_file):
+        with codecs.open(local_config_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    elif os.path.exists(config_file):
+        with codecs.open(config_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    else:
+        print("[ERROR] No config file found (config.local.json or config.json)")
         return None
-    with codecs.open(config_file, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 def send_popo_message(webhook_url, keyword, message):
-    """发送 POPO 消息"""
+    """发送单条 POPO 消息"""
     try:
         full_message = "{0} {1}".format(keyword, message)
         data = json.dumps({"message": full_message})
@@ -49,7 +60,7 @@ def send_popo_message(webhook_url, keyword, message):
         else:
             req = Request(webhook_url, data.encode('utf-8'))
         
-        req.add_header('Content-Type', 'application/json')
+        req.add_header('Content-Type', 'application/json; charset=utf-8')
         response = urlopen(req, timeout=30)
         result = json.loads(response.read().decode('utf-8'))
         
@@ -62,6 +73,105 @@ def send_popo_message(webhook_url, keyword, message):
     except Exception as e:
         print("[ERROR] POPO send error: {0}".format(str(e)))
         return False
+
+def send_popo_messages_chunked(webhook_url, keyword, messages_list):
+    """分段发送多条 POPO 消息"""
+    success_count = 0
+    for i, msg in enumerate(messages_list):
+        print("[INFO] Sending message {0}/{1}...".format(i + 1, len(messages_list)))
+        if send_popo_message(webhook_url, keyword, msg):
+            success_count += 1
+        # 防止发送过快
+        if i < len(messages_list) - 1:
+            time.sleep(1)
+    return success_count
+
+def format_full_report_messages(bug_messages, at_me_messages, group_name):
+    """将完整报告格式化为多条消息（用于分段发送）"""
+    from analyze import has_reference_message
+    
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    messages = []
+    
+    # 第一条消息：统计信息
+    header = "📊微信群Bug分析报告\n"
+    header += "群名: {0}\n".format(group_name)
+    header += "时间: {0}\n\n".format(now)
+    header += "📌统计:\n"
+    header += "• Bug消息: {0}条\n".format(len(bug_messages))
+    header += "• @我消息: {0}条\n".format(len(at_me_messages))
+    
+    # 统计含引用的消息数
+    ref_count = 0
+    for m in bug_messages + at_me_messages:
+        if has_reference_message(m['content']):
+            ref_count += 1
+    if ref_count > 0:
+        header += "• ⚠️含引用: {0}条 (需查微信原文)\n".format(ref_count)
+    
+    # 构建 Bug 消息内容
+    current_msg = header
+    if bug_messages:
+        current_msg += "\n🐛Bug反馈原文:\n"
+    
+    for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
+        content = msg['content'].replace('\n', ' ')[:300]
+        if len(msg['content']) > 300:
+            content += '...'
+        
+        # 添加引用标记
+        ref_mark = " ⚠️含引用" if has_reference_message(msg['content']) else ""
+        
+        entry = "\n{0}️⃣ [{1}] {2}:\n{3}{4}\n".format(
+            i if i <= 10 else i,
+            msg['timestamp'][5:16],
+            msg['sender'],
+            content,
+            ref_mark
+        )
+        
+        # 检查是否超长，需要分段
+        if len(current_msg) + len(entry) > MAX_MESSAGE_LENGTH:
+            messages.append(current_msg)
+            current_msg = "🐛Bug反馈原文(续):\n" + entry
+        else:
+            current_msg += entry
+    
+    # 添加 @我 的消息
+    if at_me_messages:
+        at_me_header = "\n📢@我的消息:\n"
+        if len(current_msg) + len(at_me_header) > MAX_MESSAGE_LENGTH:
+            messages.append(current_msg)
+            current_msg = at_me_header
+        else:
+            current_msg += at_me_header
+        
+        for i, msg in enumerate(sorted(at_me_messages, key=lambda x: x['timestamp']), 1):
+            content = msg['content'].replace('\n', ' ')[:200]
+            if len(msg['content']) > 200:
+                content += '...'
+            
+            ref_mark = " ⚠️含引用" if has_reference_message(msg['content']) else ""
+            
+            entry = "\n{0}️⃣ [{1}] {2}:\n{3}{4}\n".format(
+                i if i <= 10 else i,
+                msg['timestamp'][5:16],
+                msg['sender'],
+                content,
+                ref_mark
+            )
+            
+            if len(current_msg) + len(entry) > MAX_MESSAGE_LENGTH:
+                messages.append(current_msg)
+                current_msg = "📢@我的消息(续):\n" + entry
+            else:
+                current_msg += entry
+    
+    # 添加最后一条消息
+    if current_msg:
+        messages.append(current_msg)
+    
+    return messages
 
 def run_analysis(config):
     """运行分析"""
@@ -101,6 +211,9 @@ def run_analysis(config):
     return {
         'bug_count': len(bug_messages),
         'at_me_count': len(at_me_messages),
+        'bug_messages': bug_messages,
+        'at_me_messages': at_me_messages,
+        'group_name': group_name,
         'report': report,
         'summary': summary
     }
@@ -128,20 +241,23 @@ def main():
         keyword = config.get('popo_keyword', '总结')
         
         if webhook:
-            # 构建消息
             now = datetime.now().strftime('%Y-%m-%d %H:%M')
-            message = "📊 微信群自动分析报告\n"
-            message += "时间: {0}\n\n".format(now)
-            message += "📌 统计:\n"
-            message += "• Bug 消息: {0} 条\n".format(result['bug_count'])
-            message += "• @我 消息: {0} 条\n".format(result['at_me_count'])
             
             if result['bug_count'] > 0 or result['at_me_count'] > 0:
-                message += "\n详情请查看完整报告"
+                # 有内容时推送完整原文报告（分段发送）
+                popo_messages = format_full_report_messages(
+                    result['bug_messages'],
+                    result['at_me_messages'],
+                    result['group_name']
+                )
+                print("[INFO] Will send {0} message(s) to POPO".format(len(popo_messages)))
+                send_popo_messages_chunked(webhook, keyword, popo_messages)
             else:
-                message += "\n✅ 暂无需要处理的消息"
-            
-            send_popo_message(webhook, keyword, message)
+                # 无内容时推送简短消息
+                message = "📊 微信群自动分析报告\n"
+                message += "时间: {0}\n\n".format(now)
+                message += "✅ 暂无需要处理的 Bug 消息或 @我 消息"
+                send_popo_message(webhook, keyword, message)
     
     print("\n[OK] 自动分析任务完成")
     print("=" * 50 + "\n")
