@@ -1,0 +1,45 @@
+{
+  "reviews": [
+    {
+      "timestamp": "2026-03-12 20:42:00",
+      "content": "新来的宝子们大家晚上好 群里昵称麻烦改成和大家统一的哈 游戏内昵称数字ID 欢迎大家定向咨询及反馈 BUG处理相关",
+      "type": "false_positive",
+      "reason": "群公告，不是bug反馈，只是提及了BUG处理联系人"
+    },
+    {
+      "timestamp": "2026-03-12 20:42:10",
+      "content": "怎么遇到问题你就沉默了呢",
+      "type": "false_positive",
+      "reason": "日常聊天调侃，不是bug反馈"
+    },
+    {
+      "timestamp": "2026-03-12 20:42:20",
+      "content": "今天打突围，看淘汰回放，有显示本局出现女仆，捆绑撤离后可成私人女仆",
+      "type": "correct",
+      "reason": "真实bug反馈：游戏中回放显示问题"
+    },
+    {
+      "timestamp": "2026-03-12 20:42:30",
+      "content": "还有经典，有时候有抓虫有时候没有",
+      "type": "correct",
+      "reason": "真实bug反馈：功能不稳定问题"
+    },
+    {
+      "timestamp": "2026-03-12 20:42:40",
+      "content": "女仆难道是日服的专属吗还是穿特殊衣服才有",
+      "type": "false_positive",
+      "reason": "纯提问，不是bug反馈"
+    },
+    {
+      "timestamp": "2026-03-12 20:42:50",
+      "content": "造密码的玉球 瞎给我报名 点开系统一看 全是突围黑产又不封",
+      "type": "false_positive",
+      "reason": "关于外挂/黑产的抱怨，不是bug反馈"
+    }
+  ],
+  "stats": {
+    "false_positive": 4,
+    "correct": 2,
+    "total": 6
+  }
+}

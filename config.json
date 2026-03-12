@@ -1,0 +1,9 @@
+{
+  "message_input": "../qsec-wechat-export/message.txt",
+  "group_name": "手游-荒野行动核心玩家交流2群",
+  "nickname": "修bug小弟",
+  "popo_webhook": "https://open.popo.netease.com/open-apis/robots/v1/hook/Tj0nH2wKUMEjQhogQBpK9Uq1CEEH0EFLWr07PLqMNLKJXU6wnGMKQbcCh7WwJVYYZAnUK6YeU6YZUnaSZlde8M97TNvyxmsA",
+  "popo_keyword": "总结",
+  "auto_analyze_interval": 3600,
+  "auto_push_to_popo": true
+}
