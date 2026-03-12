@@ -87,32 +87,30 @@ def send_popo_messages_chunked(webhook_url, keyword, messages_list):
     return success_count
 
 def format_full_report_messages(bug_messages, at_me_messages, group_name):
-    """将完整报告格式化为多条消息（用于分段发送）"""
+    """将完整报告格式化为多条消息（用于分段发送）- 新格式"""
     from analyze import has_reference_message
     
-    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    # 计算时间范围
+    all_msgs = bug_messages + at_me_messages
+    if all_msgs:
+        sorted_msgs = sorted(all_msgs, key=lambda x: x['timestamp'])
+        time_start = sorted_msgs[0]['timestamp']
+        time_end = sorted_msgs[-1]['timestamp']
+    else:
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        time_start = now
+        time_end = now
+    
     messages = []
     
-    # 第一条消息：统计信息
-    header = "📊微信群Bug分析报告\n"
-    header += "群名: {0}\n".format(group_name)
-    header += "时间: {0}\n\n".format(now)
-    header += "📌统计:\n"
-    header += "• Bug消息: {0}条\n".format(len(bug_messages))
-    header += "• @我消息: {0}条\n".format(len(at_me_messages))
-    
-    # 统计含引用的消息数
-    ref_count = 0
-    for m in bug_messages + at_me_messages:
-        if has_reference_message(m['content']):
-            ref_count += 1
-    if ref_count > 0:
-        header += "• ⚠️含引用: {0}条 (需查微信原文)\n".format(ref_count)
+    # 第一条消息：头部信息
+    header = "🎮 荒野行动群聊 Bug 监控报告\n"
+    header += "⏰ 时间范围：{0} ~ {1}\n".format(time_start, time_end)
+    header += "📊 发现 bug 数：{0}\n".format(len(bug_messages))
+    header += "=" * 50
     
     # 构建 Bug 消息内容
     current_msg = header
-    if bug_messages:
-        current_msg += "\n🐛Bug反馈原文:\n"
     
     for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
         content = msg['content'].replace('\n', ' ')[:300]
@@ -122,24 +120,23 @@ def format_full_report_messages(bug_messages, at_me_messages, group_name):
         # 添加引用标记
         ref_mark = " ⚠️含引用" if has_reference_message(msg['content']) else ""
         
-        entry = "\n{0}️⃣ [{1}] {2}:\n{3}{4}\n".format(
-            i if i <= 10 else i,
-            msg['timestamp'][5:16],
-            msg['sender'],
-            content,
-            ref_mark
-        )
+        entry = "\n\n【{0}】{1} @ {2}\n".format(i, msg['sender'], msg['timestamp'])
+        entry += "群组：{0}\n".format(msg['group'])
+        entry += "内容：{0}{1}\n".format(content, ref_mark)
+        entry += "-" * 30
         
         # 检查是否超长，需要分段
         if len(current_msg) + len(entry) > MAX_MESSAGE_LENGTH:
             messages.append(current_msg)
-            current_msg = "🐛Bug反馈原文(续):\n" + entry
+            current_msg = "🎮 Bug 监控报告 (续)\n" + "=" * 50 + entry
         else:
             current_msg += entry
     
     # 添加 @我 的消息
     if at_me_messages:
-        at_me_header = "\n📢@我的消息:\n"
+        at_me_header = "\n\n📢 @我 的消息数：{0}\n".format(len(at_me_messages))
+        at_me_header += "=" * 50
+        
         if len(current_msg) + len(at_me_header) > MAX_MESSAGE_LENGTH:
             messages.append(current_msg)
             current_msg = at_me_header
@@ -153,17 +150,14 @@ def format_full_report_messages(bug_messages, at_me_messages, group_name):
             
             ref_mark = " ⚠️含引用" if has_reference_message(msg['content']) else ""
             
-            entry = "\n{0}️⃣ [{1}] {2}:\n{3}{4}\n".format(
-                i if i <= 10 else i,
-                msg['timestamp'][5:16],
-                msg['sender'],
-                content,
-                ref_mark
-            )
+            entry = "\n\n【{0}】{1} @ {2}\n".format(i, msg['sender'], msg['timestamp'])
+            entry += "群组：{0}\n".format(msg['group'])
+            entry += "内容：{0}{1}\n".format(content, ref_mark)
+            entry += "-" * 30
             
             if len(current_msg) + len(entry) > MAX_MESSAGE_LENGTH:
                 messages.append(current_msg)
-                current_msg = "📢@我的消息(续):\n" + entry
+                current_msg = "📢 @我 的消息 (续)\n" + "=" * 50 + entry
             else:
                 current_msg += entry
     

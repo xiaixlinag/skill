@@ -263,66 +263,62 @@ def format_message_with_ref_marker(msg, max_length=200):
     return content
 
 def generate_report(bug_messages, at_me_messages, group_name, output_path):
-    """生成分析报告"""
+    """生成分析报告（新格式）"""
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # 去重统计
-    all_msgs = {}
-    for m in bug_messages + at_me_messages:
-        key = "{0}_{1}_{2}".format(m['timestamp'], m['sender'], m['content'][:50])
-        all_msgs[key] = m
-    unique_count = len(all_msgs)
+    # 计算时间范围
+    all_msgs = bug_messages + at_me_messages
+    if all_msgs:
+        sorted_msgs = sorted(all_msgs, key=lambda x: x['timestamp'])
+        time_start = sorted_msgs[0]['timestamp']
+        time_end = sorted_msgs[-1]['timestamp']
+    else:
+        time_start = now
+        time_end = now
     
     # 统计含引用消息的数量
     ref_count = 0
-    for m in list(all_msgs.values()):
+    for m in all_msgs:
         if has_reference_message(m['content']):
             ref_count += 1
     
+    # === 完整报告 ===
     report_lines = [
-        u"📊 微信群 Bug 反馈分析报告",
-        u"=" * 40,
-        u"群名称: {0}".format(group_name),
-        u"分析时间: {0}".format(now),
-        u"",
-        u"📌 摘要统计",
-        u"-" * 40,
-        u"Bug 相关消息: {0} 条".format(len(bug_messages)),
-        u"@我 的消息: {0} 条".format(len(at_me_messages)),
-        u"去重后总计: {0} 条".format(unique_count),
+        u"🎮 荒野行动群聊 Bug 监控报告",
+        u"⏰ 时间范围：{0} ~ {1}".format(time_start, time_end),
+        u"📊 发现 bug 数：{0}".format(len(bug_messages)),
+        u"=" * 50,
     ]
-    
-    # 如果有引用消息，添加提示
-    if ref_count > 0:
-        report_lines.append(u"⚠️ 含引用消息: {0} 条 (需人工查看微信原文)".format(ref_count))
-    
-    report_lines.append(u"")
     
     # Bug 反馈详情
     if bug_messages:
-        report_lines.append(u"🐛 Bug 反馈详情 (按时间排序)")
-        report_lines.append(u"-" * 40)
-        for msg in sorted(bug_messages, key=lambda x: x['timestamp']):
-            content_full = format_message_with_ref_marker(msg, 500)
-            report_lines.append(u"[{0}] {1}: {2}".format(msg['timestamp'], msg['sender'], content_full))
-        report_lines.append(u"")
+        for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
+            content = msg['content'].replace('\n', ' ')
+            ref_mark = u" ⚠️含引用" if has_reference_message(msg['content']) else ""
+            report_lines.append(u"")
+            report_lines.append(u"【{0}】{1} @ {2}".format(i, msg['sender'], msg['timestamp']))
+            report_lines.append(u"群组：{0}".format(msg['group']))
+            report_lines.append(u"内容：{0}{1}".format(content, ref_mark))
+            report_lines.append(u"-" * 30)
     
     # @我 的消息
     if at_me_messages:
-        report_lines.append(u"📢 @我 的消息")
-        report_lines.append(u"-" * 40)
-        for msg in sorted(at_me_messages, key=lambda x: x['timestamp']):
-            content_preview = format_message_with_ref_marker(msg, 100)
-            report_lines.append(u"[{0}] {1}: {2}".format(msg['timestamp'], msg['sender'], content_preview))
         report_lines.append(u"")
+        report_lines.append(u"📢 @我 的消息数：{0}".format(len(at_me_messages)))
+        report_lines.append(u"=" * 50)
+        for i, msg in enumerate(sorted(at_me_messages, key=lambda x: x['timestamp']), 1):
+            content = msg['content'].replace('\n', ' ')
+            ref_mark = u" ⚠️含引用" if has_reference_message(msg['content']) else ""
+            report_lines.append(u"")
+            report_lines.append(u"【{0}】{1} @ {2}".format(i, msg['sender'], msg['timestamp']))
+            report_lines.append(u"群组：{0}".format(msg['group']))
+            report_lines.append(u"内容：{0}{1}".format(content, ref_mark))
+            report_lines.append(u"-" * 30)
     
     # 如果有引用消息，添加说明
     if ref_count > 0:
         report_lines.append(u"")
-        report_lines.append(u"📋 说明:")
-        report_lines.append(u"-" * 40)
-        report_lines.append(u"⚠️含引用 = 该消息引用/回复了其他消息，")
-        report_lines.append(u"   但引用内容无法自动解析，请到微信中查看原文。")
+        report_lines.append(u"⚠️ 有 {0} 条消息含引用，需到微信查看原文".format(ref_count))
     
     report_content = '\n'.join(report_lines)
     
@@ -330,41 +326,26 @@ def generate_report(bug_messages, at_me_messages, group_name, output_path):
     with codecs.open(output_path, 'w', encoding='utf-8') as f:
         f.write(report_content)
     
-    # 生成摘要报告（用于 POPO 推送，包含完整内容）
+    # === POPO 摘要报告 ===
     summary_lines = [
-        u"📊 微信群 Bug 反馈分析报告",
-        u"群名: {0}".format(group_name),
-        u"时间: {0}".format(now),
-        u"",
-        u"📌 统计:",
-        u"• Bug 消息: {0} 条".format(len(bug_messages)),
-        u"• @我 消息: {0} 条".format(len(at_me_messages)),
-        u"• 去重总计: {0} 条".format(unique_count)
+        u"🎮 荒野行动群聊 Bug 监控报告",
+        u"⏰ 时间范围：{0} ~ {1}".format(time_start, time_end),
+        u"� 发现 bug 数：{0}".format(len(bug_messages)),
+        u"=" * 50,
     ]
     
-    # 如果有引用消息，添加提示
-    if ref_count > 0:
-        summary_lines.append(u"• ⚠️含引用: {0} 条 (需查看微信原文)".format(ref_count))
-    
-    # 添加所有 bug 消息的完整内容
+    # Bug 反馈详情
     if bug_messages:
-        summary_lines.append(u"")
-        summary_lines.append(u"🐛 Bug 反馈详情:")
         for i, msg in enumerate(sorted(bug_messages, key=lambda x: x['timestamp']), 1):
-            content_full = format_message_with_ref_marker(msg, 200)
+            content = msg['content'].replace('\n', ' ')[:200]
+            if len(msg['content']) > 200:
+                content += u'...'
+            ref_mark = u" ⚠️含引用" if has_reference_message(msg['content']) else ""
             summary_lines.append(u"")
-            summary_lines.append(u"{0}️⃣ [{1}] {2}:".format(i, msg['timestamp'][5:16], msg['sender']))
-            summary_lines.append(u"{0}".format(content_full))
-    
-    # 添加所有 @我 的消息完整内容
-    if at_me_messages:
-        summary_lines.append(u"")
-        summary_lines.append(u"📢 @我 的消息:")
-        for i, msg in enumerate(sorted(at_me_messages, key=lambda x: x['timestamp']), 1):
-            content_full = format_message_with_ref_marker(msg, 200)
-            summary_lines.append(u"")
-            summary_lines.append(u"{0}️⃣ [{1}] {2}:".format(i, msg['timestamp'][5:16], msg['sender']))
-            summary_lines.append(u"{0}".format(content_full))
+            summary_lines.append(u"【{0}】{1} @ {2}".format(i, msg['sender'], msg['timestamp']))
+            summary_lines.append(u"群组：{0}".format(msg['group']))
+            summary_lines.append(u"内容：{0}{1}".format(content, ref_mark))
+            summary_lines.append(u"-" * 30)
     
     summary_content = '\n'.join(summary_lines)
     
